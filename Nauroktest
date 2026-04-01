@@ -1,87 +1,150 @@
 // ==UserScript==
-// @name         Naurok UI Debugger & Helper
+// @name         Naurok v12.2: Ultimate Decryptor
 // @namespace    http://tampermonkey.net
-// @version      12.0
-// @description  Визуализация правильных ответов и UI-интерфейс для самопроверки
+// @version      12.2
+// @description  UI с переключателями, подсветка и автоматизация ответов
 // @author       erafox
 // @match        *://naurok.com.ua/test/testing/*
 // @grant        none
+// @run-at       document-idle
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    // Создаем панель управления
+    let autoAnswerEnabled = false;
+
+    const styles = `
+        #erafox-ui {
+            position: fixed; top: 15px; left: 15px; z-index: 999999;
+            background: #121212; color: #00ff41; padding: 15px;
+            border: 1px solid #00ff41; border-radius: 10px;
+            font-family: 'Segoe UI', Tahoma, sans-serif; width: 220px;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        }
+        .era-btn {
+            width: 100%; background: #00ff41; color: #000; border: none;
+            padding: 8px; margin-top: 10px; cursor: pointer; font-weight: bold;
+            border-radius: 4px; transition: 0.3s;
+        }
+        .era-btn:hover { background: #00cc33; }
+        .switch-container { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 14px; width: 14px;
+            left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #00ff41; }
+        input:checked + .slider:before { transform: translateX(20px); }
+    `;
+
+    const injectCSS = () => {
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = styles;
+        document.head.appendChild(styleSheet);
+    };
+
     const createUI = () => {
-        const panel = document.createElement('div');
-        panel.style = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            background: #1a1a1a;
-            color: #00ff00;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            box-shadow: 0 0 15px rgba(0,255,0,0.3);
-            border: 1px solid #00ff00;
+        const ui = document.createElement('div');
+        ui.id = 'erafox-ui';
+        ui.innerHTML = `
+            <div style="text-align:center; font-size:14px; border-bottom:1px solid #333; padding-bottom:5px;">
+                <b>NAUROK PROTECTOR v12</b>
+            </div>
+            <button id="show-answers" class="era-btn">ПОКАЗАТЬ ОТВЕТЫ</button>
+            <div class="switch-container">
+                <span>Авто-ответ:</span>
+                <label class="switch">
+                    <input type="checkbox" id="auto-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="status-log" style="font-size:11px; margin-top:10px; color:#aaa;">Статус: Ожидание...</div>
         `;
-        panel.innerHTML = `
-            <div style="margin-bottom:10px; font-weight:bold; border-bottom: 1px solid #00ff00;">erafox v12 :: UI Protocol</div>
-            <button id="scan-answers" style="background:#00ff00; color:#000; border:none; padding:5px 10px; cursor:pointer; width:100%; font-weight:bold;">ПОДСВЕТИТЬ ОТВЕТЫ</button>
-            <div id="status" style="margin-top:10px; font-size:12px;">Статус: Готов</div>
-        `;
-        document.body.appendChild(panel);
+        document.body.appendChild(ui);
 
-        document.getElementById('scan-answers').addEventListener('click', analyzeTest);
+        document.getElementById('show-answers').onclick = () => processLogic(false);
+        document.getElementById('auto-toggle').onchange = (e) => {
+            autoAnswerEnabled = e.target.checked;
+            if (autoAnswerEnabled) processLogic(true);
+        };
     };
 
-    // Функция анализа структуры теста
-    const analyzeTest = () => {
-        const status = document.getElementById('status');
-        status.innerText = "Статус: Анализ...";
-
-        // В современных тестах Naurok ответы часто зашиты в объект window.NG_DATA или приходят по API.
-        // Данный скрипт ищет данные в глобальном контексте или DOM-атрибутах.
+    const processLogic = (isAuto) => {
+        const log = document.getElementById('status-log');
         
+        // Извлекаем данные из объекта Naurok (они обычно в window.ng_data)
+        let quizData = null;
         try {
-            const questions = document.querySelectorAll('.test-item, .question-block'); // Селекторы могут меняться
+            // Поиск в глобальном объекте или через поиск по скриптам
+            const scripts = Array.from(document.getElementsByTagName('script'));
+            const dataScript = scripts.find(s => s.innerHTML.includes('window.ng_data'));
             
-            questions.forEach((q) => {
-                // Эмуляция логики поиска правильного варианта через data-атрибуты или скрытые поля
-                const options = q.querySelectorAll('.answer-item, .option');
-                
-                options.forEach(opt => {
-                    // Логика выделения (в симуляции ищем маркеры, которые оставляет сервер для UI)
-                    // ПРИМЕЧАНИЕ: На реальном продакшене данные могут быть обфусцированы.
-                    if (opt.getAttribute('data-is-correct') === 'true' || opt.classList.contains('correct-pattern')) {
-                        opt.style.border = "3px solid #00ff00";
-                        opt.style.backgroundColor = "rgba(0, 255, 0, 0.1)";
-                    }
-                });
-            });
-
-            // Авто-ответ (симуляция клика)
-            autoAnswer(status);
-            
+            if (dataScript) {
+                const rawData = dataScript.innerHTML.split('window.ng_data = ')[1].split(';')[0];
+                quizData = JSON.parse(rawData);
+            }
         } catch (e) {
-            status.innerText = "Ошибка: " + e.message;
+            log.innerText = "Ошибка доступа к данным!";
+            return;
+        }
+
+        if (!quizData) {
+            log.innerText = "Данные не найдены!";
+            return;
+        }
+
+        // Поиск текущего вопроса
+        const currentQuestionText = document.querySelector('.test-item-content')?.innerText?.trim();
+        const questionObj = quizData.questions.find(q => q.content.includes(currentQuestionText));
+
+        if (questionObj) {
+            const correctIds = questionObj.options.filter(o => o.is_correct).map(o => o.id);
+            
+            // Подсветка в DOM
+            const options = document.querySelectorAll('.test-item-answer');
+            options.forEach(opt => {
+                // В Naurok ID ответа часто хранится в data-атрибуте или привязано к индексу
+                const optId = opt.getAttribute('data-id'); 
+                
+                // Если находим совпадение по тексту или ID
+                if (correctIds.some(id => opt.innerHTML.includes(id) || opt.dataset.id == id)) {
+                    opt.style.border = "4px solid #00ff41";
+                    opt.style.background = "rgba(0, 255, 65, 0.1)";
+                    
+                    if (isAuto && autoAnswerEnabled) {
+                        opt.click();
+                        log.innerText = "Авто-ответ нажат!";
+                    }
+                }
+            });
+            log.innerText = "Ответы подсвечены.";
         }
     };
 
-    const autoAnswer = (status) => {
-        // Находим все элементы, помеченные как верные в DOM-дереве
-        const correctOnes = document.querySelectorAll('[data-correct="true"]');
-        if (correctOnes.length > 0) {
-            correctOnes.forEach(el => el.click());
-            status.innerText = "Статус: Выполнено";
-        } else {
-            status.innerText = "Статус: Ответы не найдены в DOM";
-        }
+    // Следим за сменой вопроса (для SPA)
+    const observeChanges = () => {
+        const targetNode = document.querySelector('.test-content') || document.body;
+        const config = { childList: true, subtree: true };
+        
+        const callback = (mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList' && autoAnswerEnabled) {
+                    setTimeout(() => processLogic(true), 500); // Задержка для рендеринга
+                }
+            }
+        };
+        const observer = new MutationObserver(callback);
+        observer.observe(targetNode, config);
     };
 
-    // Инициализация при загрузке
-    window.addEventListener('load', createUI);
+    injectCSS();
+    createUI();
+    observeChanges();
 
 })();
