@@ -1,131 +1,113 @@
 // ==UserScript==
-// @name         Naurok Erafox v14.5 Absolute
+// @name         Naurok Erafox v15.0 Global Fix
 // @namespace    http://tampermonkey.net
-// @version      14.5
-// @description  Удален Стелс. Фокус на Подсветке и Авто-ответе. Дизайн Erafox Engine.
+// @version      15.0
+// @description  Полный фикс селекторов. Глубокое сканирование ядра ng_data.
 // @author       erafox
 // @match        *://naurok.com.ua/test/testing/*
 // @grant        none
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    let activeMode = 'Подсветка'; 
+    let activeMode = 'Подсветка';
 
     const styles = `
-        #era-absolute-panel {
-            position: fixed; top: 25px; right: 25px; z-index: 999999;
-            width: 260px; background: #0a0a0a; border: 2px solid #ff1f1f;
-            border-radius: 14px; font-family: 'Segoe UI', sans-serif;
-            color: #fff; padding: 20px; box-shadow: 0 0 25px rgba(255, 31, 31, 0.4);
+        #era-v15-panel {
+            position: fixed; top: 20px; right: 20px; z-index: 2147483647;
+            width: 250px; background: #080808; border: 1px solid #ff0000;
+            border-radius: 10px; font-family: 'Courier New', monospace;
+            color: #ff0000; padding: 15px; box-shadow: 0 0 20px rgba(255,0,0,0.5);
         }
-        .era-header-small { font-size: 9px; color: #ff1f1f; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 15px; text-align: center; }
+        .era-btn-group { display: flex; gap: 5px; margin-top: 15px; }
+        .era-btn {
+            flex: 1; padding: 10px; border: 1px solid #ff0000; background: #000;
+            color: #ff0000; cursor: pointer; font-size: 10px; font-weight: bold;
+        }
+        .era-btn.active { background: #ff0000; color: #000; }
         
-        .era-engine-status {
-            background: #151515; border-radius: 10px; padding: 12px;
-            margin-bottom: 20px; border: 1px solid #252525;
-            display: flex; align-items: center; gap: 15px;
-        }
-        .era-fox-logo { font-size: 24px; filter: drop-shadow(0 0 8px #ff1f1f); }
-        .era-info h4 { margin: 0; font-size: 13px; color: #ff1f1f; }
-        .era-info p { margin: 0; font-size: 9px; color: #666; }
-
-        .era-mode-selector { display: flex; gap: 10px; background: #000; padding: 5px; border-radius: 10px; border: 1px solid #1a1a1a; }
-        .mode-tab {
-            flex: 1; background: transparent; border: none; color: #444; padding: 12px 0; 
-            font-size: 11px; cursor: pointer; border-radius: 7px; transition: 0.3s; font-weight: bold;
-        }
-        .mode-tab.active { background: #ff1f1f; color: #000; box-shadow: 0 0 15px rgba(255, 31, 31, 0.5); }
-
-        /* Эффект подсветки ответа на странице */
-        .era-correct-highlight { 
-            border: 4px solid #ff1f1f !important; 
-            background: rgba(255, 31, 31, 0.1) !important;
-            box-shadow: 0 0 30px rgba(255, 31, 31, 0.6) !important;
-            border-radius: 12px !important;
-            transform: scale(1.02);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* Жесткая подсветка через !important */
+        .era-correct-target {
+            outline: 5px solid #ff0000 !important;
+            outline-offset: -5px !important;
+            background: rgba(255, 0, 0, 0.2) !important;
+            position: relative;
+            z-index: 999;
         }
     `;
 
-    const createPanel = () => {
-        if (document.getElementById('era-absolute-panel')) return;
-        const s = document.createElement("style");
-        s.innerText = styles;
-        document.head.appendChild(s);
-
-        const p = document.createElement('div');
-        p.id = 'era-absolute-panel';
+    const inject = () => {
+        if (document.getElementById('era-v15-panel')) return;
+        const s = document.createElement('style'); s.innerText = styles; document.head.appendChild(s);
+        const p = document.createElement('div'); p.id = 'era-v15-panel';
         p.innerHTML = `
-            <div class="era-header-small">ERA-NEURAL LOGIC</div>
-            <div class="era-engine-status">
-                <div class="era-fox-logo">🦊</div>
-                <div class="era-info">
-                    <h4>Erafox Engine vX</h4>
-                    <p>Analysis: Active</p>
-                </div>
+            <div style="font-size:12px; border-bottom:1px solid #ff0000; padding-bottom:5px;">ERA_ENGINE_V15</div>
+            <div id="debug-info" style="font-size:9px; margin-top:5px; color:#555;">Status: Scan...</div>
+            <div class="era-btn-group">
+                <button class="era-btn active" id="b-show">ПОДСВЕТКА</button>
+                <button class="era-btn" id="b-auto">АВТО</button>
             </div>
-            
-            <div class="era-mode-selector">
-                <button class="mode-tab active" id="btn-show">ПОДСВЕТКА</button>
-                <button class="mode-tab" id="btn-auto">АВТО</button>
-            </div>
-            <div style="margin-top:15px; font-size:10px; color:#4caf50; text-align:center;">● Протокол синхронизирован</div>
         `;
         document.body.appendChild(p);
-
-        document.getElementById('btn-show').onclick = () => switchMode('Подсветка');
-        document.getElementById('btn-auto').onclick = () => switchMode('Авто');
+        document.getElementById('b-show').onclick = () => { activeMode = 'Подсветка'; updateUI(); };
+        document.getElementById('b-auto').onclick = () => { activeMode = 'Авто'; updateUI(); };
     };
 
-    const switchMode = (m) => {
-        activeMode = m;
-        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-        document.getElementById(m === 'Подсветка' ? 'btn-show' : 'btn-auto').classList.add('active');
-        runLogic();
+    const updateUI = () => {
+        document.getElementById('b-show').className = activeMode === 'Подсветка' ? 'era-btn active' : 'era-btn';
+        document.getElementById('b-auto').className = activeMode === 'Авто' ? 'era-btn active' : 'era-btn';
     };
 
-    const runLogic = () => {
+    const solve = () => {
+        const debug = document.getElementById('debug-info');
         try {
-            // Прямое чтение данных из Angular-контроллера Naurok
-            const controller = document.querySelector('[ng-controller="TestController"]');
-            if (!controller) return;
-            const scope = angular.element(controller).scope();
+            // Захват Angular Scope
+            const el = document.querySelector('.test-item') || document.body;
+            const scope = angular.element(el).scope();
+            if (!scope || !scope.ng_data) {
+                if (debug) debug.innerText = "Status: Ожидание данных...";
+                return;
+            }
+
+            const q = scope.ng_data.questions[scope.currentQuestionIndex];
+            const correctOptions = q.options.filter(o => o.is_correct);
             
-            const qData = scope.ng_data.questions[scope.currentQuestionIndex];
+            // Находим все элементы, которые могут быть ответами
+            const allElements = document.querySelectorAll('div, span, li');
+            
+            allElements.forEach(item => {
+                // Очищаем старую подсветку
+                item.classList.remove('era-correct-target');
 
-            if (qData) {
-                const correctIds = qData.options.filter(o => o.is_correct).map(o => o.id);
-                const optionsOnPage = document.querySelectorAll('.test-item-answer-item');
+                correctOptions.forEach(cor => {
+                    // Сопоставляем текст элемента с текстом правильного ответа из базы
+                    const cleanText = item.innerText ? item.innerText.trim() : "";
+                    const corText = cor.content ? cor.content.replace(/<[^>]*>?/gm, '').trim() : "";
 
-                optionsOnPage.forEach(el => {
-                    const id = parseInt(el.getAttribute('data-id'));
-                    el.classList.remove('era-correct-highlight');
+                    // Если текст совпал и это конечный элемент (без вложенных блоков ответов)
+                    if (cleanText === corText && cleanText.length > 0 && !item.querySelector('div')) {
+                        item.classList.add('era-correct-target');
+                        if (debug) debug.innerText = "Status: Ответ найден!";
 
-                    if (correctIds.includes(id)) {
-                        // Режим Подсветки: просто выделяем
-                        el.classList.add('era-correct-highlight');
-                        
-                        // Режим Авто: выделяем + нажимаем
                         if (activeMode === 'Авто') {
-                            setTimeout(() => {
-                                if (activeMode === 'Авто') el.click();
-                            }, 900); // Задержка 0.9 сек для имитации человека
+                            // Кликаем по родителю или самому элементу
+                            const clickable = item.closest('[role="button"]') || item.parentElement || item;
+                            setTimeout(() => { if(activeMode === 'Авто') clickable.click(); }, 1000);
                         }
                     }
                 });
-            }
-        } catch (e) { /* Анализ в процессе */ }
+            });
+        } catch (e) { if(debug) debug.innerText = "Status: Ошибка ядра"; }
     };
 
-    // Глобальный цикл мониторинга
-    setInterval(() => {
-        if (document.body) {
-            createPanel();
-            runLogic();
-        }
-    }, 800);
+    // Инициализация
+    const init = () => {
+        if (document.body) inject();
+        solve();
+    };
+
+    setInterval(init, 1000);
 
 })();
