@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Naurok v12.2: Ultimate Decryptor
+// @name         Naurok Red Cyber v13.5 (No API)
 // @namespace    http://tampermonkey.net
-// @version      12.2
-// @description  UI с переключателями, подсветка и автоматизация ответов
+// @version      13.5
+// @description  Чистий UI за референсом без зайвих запитів. Авто-відповідь та підсвітка.
 // @author       erafox
 // @match        *://naurok.com.ua/test/testing/*
 // @grant        none
@@ -12,139 +12,123 @@
 (function() {
     'use strict';
 
-    let autoAnswerEnabled = false;
+    let currentMode = 'Подсветка'; 
 
     const styles = `
-        #erafox-ui {
-            position: fixed; top: 15px; left: 15px; z-index: 999999;
-            background: #121212; color: #00ff41; padding: 15px;
-            border: 1px solid #00ff41; border-radius: 10px;
-            font-family: 'Segoe UI', Tahoma, sans-serif; width: 220px;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        #era-cyber-panel {
+            position: fixed; top: 20px; right: 20px; z-index: 9999999;
+            width: 280px; background: #120c0c; border: 1px solid #331a1a;
+            border-radius: 12px; font-family: sans-serif;
+            color: #e0e0e0; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);
         }
-        .era-btn {
-            width: 100%; background: #00ff41; color: #000; border: none;
-            padding: 8px; margin-top: 10px; cursor: pointer; font-weight: bold;
-            border-radius: 4px; transition: 0.3s;
+        .era-header { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin: 10px 0 5px; }
+        .era-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .era-card {
+            background: #1a1414; border: 1px solid #2d2424; padding: 8px;
+            border-radius: 8px; cursor: default;
         }
-        .era-btn:hover { background: #00cc33; }
-        .switch-container { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #333; transition: .4s; border-radius: 20px;
+        .era-card h4 { margin: 0; font-size: 11px; color: #ff3b3b; opacity: 0.8; }
+        .era-card p { margin: 2px 0 0; font-size: 9px; color: #666; }
+        .era-card.active { border-color: #ff3b3b; box-shadow: 0 0 10px rgba(255, 59, 59, 0.2); }
+
+        .era-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; background: #080505; padding: 4px; border-radius: 8px; margin-top: 5px; }
+        .mode-btn {
+            background: transparent; border: none; color: #555; padding: 10px 5px; 
+            font-size: 11px; cursor: pointer; border-radius: 6px; transition: 0.2s;
         }
-        .slider:before {
-            position: absolute; content: ""; height: 14px; width: 14px;
-            left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;
+        .mode-btn.active { background: #1a1414; color: #ff3b3b; border: 1px solid #331a1a; font-weight: bold; }
+        
+        /* Ефект підсвітки варіантів на сайті */
+        .cyber-correct-option { 
+            border: 3px solid #ff3b3b !important; 
+            background: rgba(255, 59, 59, 0.05) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 0 15px rgba(255, 59, 59, 0.4) !important;
         }
-        input:checked + .slider { background-color: #00ff41; }
-        input:checked + .slider:before { transform: translateX(20px); }
     `;
 
-    const injectCSS = () => {
+    const injectUI = () => {
+        if (document.getElementById('era-cyber-panel')) return;
         const styleSheet = document.createElement("style");
         styleSheet.innerText = styles;
         document.head.appendChild(styleSheet);
-    };
 
-    const createUI = () => {
-        const ui = document.createElement('div');
-        ui.id = 'erafox-ui';
-        ui.innerHTML = `
-            <div style="text-align:center; font-size:14px; border-bottom:1px solid #333; padding-bottom:5px;">
-                <b>NAUROK PROTECTOR v12</b>
+        const panel = document.createElement('div');
+        panel.id = 'era-cyber-panel';
+        panel.innerHTML = `
+            <div class="era-header" style="margin-top:0;">МОДЕЛЬ</div>
+            <div class="era-grid">
+                <div class="era-card active"><h4>GPT OSS 120B</h4><p>Умный & Быстрый</p></div>
+                <div class="era-card"><h4>Llama 3.3</h4><p>Быстрый</p></div>
             </div>
-            <button id="show-answers" class="era-btn">ПОКАЗАТЬ ОТВЕТЫ</button>
-            <div class="switch-container">
-                <span>Авто-ответ:</span>
-                <label class="switch">
-                    <input type="checkbox" id="auto-toggle">
-                    <span class="slider"></span>
-                </label>
+            
+            <div class="era-header">СТАТУС</div>
+            <div style="background:#1a1414; border-radius:8px; padding:10px; border:1px solid #2d2424; font-size:11px;">
+                <span style="color:#4caf50;">●</span> Система активна (v13.5)
             </div>
-            <div id="status-log" style="font-size:11px; margin-top:10px; color:#aaa;">Статус: Ожидание...</div>
+
+            <div class="era-header">РЕЖИМ</div>
+            <div class="era-modes">
+                <button class="mode-btn" id="m-auto">Авто</button>
+                <button class="mode-btn active" id="m-show">Подсветка</button>
+                <button class="mode-btn" id="m-stealth">Стелс</button>
+            </div>
         `;
-        document.body.appendChild(ui);
+        document.body.appendChild(panel);
 
-        document.getElementById('show-answers').onclick = () => processLogic(false);
-        document.getElementById('auto-toggle').onchange = (e) => {
-            autoAnswerEnabled = e.target.checked;
-            if (autoAnswerEnabled) processLogic(true);
-        };
+        document.getElementById('m-auto').onclick = () => setMode('Авто');
+        document.getElementById('m-show').onclick = () => setMode('Подсветка');
+        document.getElementById('m-stealth').onclick = () => setMode('Стелс');
     };
 
-    const processLogic = (isAuto) => {
-        const log = document.getElementById('status-log');
-        
-        // Извлекаем данные из объекта Naurok (они обычно в window.ng_data)
-        let quizData = null;
+    const setMode = (mode) => {
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        const btnId = mode === 'Авто' ? 'm-auto' : mode === 'Подсветка' ? 'm-show' : 'm-stealth';
+        document.getElementById(btnId).classList.add('active');
+        runHack();
+    };
+
+    const runHack = () => {
         try {
-            // Поиск в глобальном объекте или через поиск по скриптам
-            const scripts = Array.from(document.getElementsByTagName('script'));
-            const dataScript = scripts.find(s => s.innerHTML.includes('window.ng_data'));
+            // Отримуємо дані з об'єкта Naurok
+            const ngElement = document.querySelector('[ng-controller="TestController"]');
+            if (!ngElement) return;
             
-            if (dataScript) {
-                const rawData = dataScript.innerHTML.split('window.ng_data = ')[1].split(';')[0];
-                quizData = JSON.parse(rawData);
-            }
-        } catch (e) {
-            log.innerText = "Ошибка доступа к данным!";
-            return;
-        }
+            const scope = angular.element(ngElement).scope();
+            const questions = scope.ng_data.questions;
+            const currentQIndex = scope.currentQuestionIndex;
+            const currentQuestion = questions[currentQIndex];
 
-        if (!quizData) {
-            log.innerText = "Данные не найдены!";
-            return;
-        }
+            if (currentQuestion) {
+                const correctIds = currentQuestion.options.filter(o => o.is_correct).map(o => o.id);
+                const domOptions = document.querySelectorAll('.test-item-answer-item');
 
-        // Поиск текущего вопроса
-        const currentQuestionText = document.querySelector('.test-item-content')?.innerText?.trim();
-        const questionObj = quizData.questions.find(q => q.content.includes(currentQuestionText));
+                domOptions.forEach(optionElement => {
+                    const optionId = parseInt(optionElement.getAttribute('data-id'));
+                    optionElement.classList.remove('cyber-correct-option');
 
-        if (questionObj) {
-            const correctIds = questionObj.options.filter(o => o.is_correct).map(o => o.id);
-            
-            // Подсветка в DOM
-            const options = document.querySelectorAll('.test-item-answer');
-            options.forEach(opt => {
-                // В Naurok ID ответа часто хранится в data-атрибуте или привязано к индексу
-                const optId = opt.getAttribute('data-id'); 
-                
-                // Если находим совпадение по тексту или ID
-                if (correctIds.some(id => opt.innerHTML.includes(id) || opt.dataset.id == id)) {
-                    opt.style.border = "4px solid #00ff41";
-                    opt.style.background = "rgba(0, 255, 65, 0.1)";
-                    
-                    if (isAuto && autoAnswerEnabled) {
-                        opt.click();
-                        log.innerText = "Авто-ответ нажат!";
+                    if (correctIds.includes(optionId)) {
+                        if (currentMode === 'Подсветка' || currentMode === 'Авто') {
+                            optionElement.classList.add('cyber-correct-option');
+                        }
+                        if (currentMode === 'Авто') {
+                            // Авто-клік з невеликою затримкою для імітації людини
+                            setTimeout(() => {
+                                if (currentMode === 'Авто') optionElement.click();
+                            }, 1200);
+                        }
                     }
-                }
-            });
-            log.innerText = "Ответы подсвечены.";
-        }
-    };
-
-    // Следим за сменой вопроса (для SPA)
-    const observeChanges = () => {
-        const targetNode = document.querySelector('.test-content') || document.body;
-        const config = { childList: true, subtree: true };
-        
-        const callback = (mutationsList) => {
-            for (const mutation of mutationsList) {
-                if (mutation.type === 'childList' && autoAnswerEnabled) {
-                    setTimeout(() => processLogic(true), 500); // Задержка для рендеринга
-                }
+                });
             }
-        };
-        const observer = new MutationObserver(callback);
-        observer.observe(targetNode, config);
+        } catch (e) { /* silent fail */ }
     };
 
-    injectCSS();
-    createUI();
-    observeChanges();
+    const setInterv = setInterval(() => {
+        if (document.body) {
+            injectUI();
+            runHack();
+        }
+    }, 1000);
 
 })();
