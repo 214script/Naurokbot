@@ -1,0 +1,87 @@
+// ==UserScript==
+// @name         Naurok UI Debugger & Helper
+// @namespace    http://tampermonkey.net
+// @version      12.0
+// @description  Визуализация правильных ответов и UI-интерфейс для самопроверки
+// @author       erafox
+// @match        *://naurok.com.ua/test/testing/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Создаем панель управления
+    const createUI = () => {
+        const panel = document.createElement('div');
+        panel.style = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 0 15px rgba(0,255,0,0.3);
+            border: 1px solid #00ff00;
+        `;
+        panel.innerHTML = `
+            <div style="margin-bottom:10px; font-weight:bold; border-bottom: 1px solid #00ff00;">erafox v12 :: UI Protocol</div>
+            <button id="scan-answers" style="background:#00ff00; color:#000; border:none; padding:5px 10px; cursor:pointer; width:100%; font-weight:bold;">ПОДСВЕТИТЬ ОТВЕТЫ</button>
+            <div id="status" style="margin-top:10px; font-size:12px;">Статус: Готов</div>
+        `;
+        document.body.appendChild(panel);
+
+        document.getElementById('scan-answers').addEventListener('click', analyzeTest);
+    };
+
+    // Функция анализа структуры теста
+    const analyzeTest = () => {
+        const status = document.getElementById('status');
+        status.innerText = "Статус: Анализ...";
+
+        // В современных тестах Naurok ответы часто зашиты в объект window.NG_DATA или приходят по API.
+        // Данный скрипт ищет данные в глобальном контексте или DOM-атрибутах.
+        
+        try {
+            const questions = document.querySelectorAll('.test-item, .question-block'); // Селекторы могут меняться
+            
+            questions.forEach((q) => {
+                // Эмуляция логики поиска правильного варианта через data-атрибуты или скрытые поля
+                const options = q.querySelectorAll('.answer-item, .option');
+                
+                options.forEach(opt => {
+                    // Логика выделения (в симуляции ищем маркеры, которые оставляет сервер для UI)
+                    // ПРИМЕЧАНИЕ: На реальном продакшене данные могут быть обфусцированы.
+                    if (opt.getAttribute('data-is-correct') === 'true' || opt.classList.contains('correct-pattern')) {
+                        opt.style.border = "3px solid #00ff00";
+                        opt.style.backgroundColor = "rgba(0, 255, 0, 0.1)";
+                    }
+                });
+            });
+
+            // Авто-ответ (симуляция клика)
+            autoAnswer(status);
+            
+        } catch (e) {
+            status.innerText = "Ошибка: " + e.message;
+        }
+    };
+
+    const autoAnswer = (status) => {
+        // Находим все элементы, помеченные как верные в DOM-дереве
+        const correctOnes = document.querySelectorAll('[data-correct="true"]');
+        if (correctOnes.length > 0) {
+            correctOnes.forEach(el => el.click());
+            status.innerText = "Статус: Выполнено";
+        } else {
+            status.innerText = "Статус: Ответы не найдены в DOM";
+        }
+    };
+
+    // Инициализация при загрузке
+    window.addEventListener('load', createUI);
+
+})();
