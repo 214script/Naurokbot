@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Naurok Erafox Neural v14
+// @name         Naurok Erafox v14.5 Absolute
 // @namespace    http://tampermonkey.net
-// @version      14.0
-// @description  Ексклюзивний інтерфейс Erafox Engine для аналізу тестів Naurok
+// @version      14.5
+// @description  Удален Стелс. Фокус на Подсветке и Авто-ответе. Дизайн Erafox Engine.
 // @author       erafox
 // @match        *://naurok.com.ua/test/testing/*
 // @grant        none
@@ -12,131 +12,120 @@
 (function() {
     'use strict';
 
-    let activeMode = 'Подсветка';
+    let activeMode = 'Подсветка'; 
 
     const styles = `
-        #era-neural-panel {
-            position: fixed; top: 20px; right: 20px; z-index: 1000000;
-            width: 280px; background: #0d0d0d; border: 1px solid #451010;
-            border-radius: 12px; font-family: 'Segoe UI', sans-serif;
-            color: #efefef; padding: 18px; box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
+        #era-absolute-panel {
+            position: fixed; top: 25px; right: 25px; z-index: 999999;
+            width: 260px; background: #0a0a0a; border: 2px solid #ff1f1f;
+            border-radius: 14px; font-family: 'Segoe UI', sans-serif;
+            color: #fff; padding: 20px; box-shadow: 0 0 25px rgba(255, 31, 31, 0.4);
         }
-        .era-title { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+        .era-header-small { font-size: 9px; color: #ff1f1f; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 15px; text-align: center; }
         
-        .era-engine-box {
-            background: linear-gradient(145deg, #1a0a0a, #0a0505);
-            border: 1px solid #331111; padding: 12px; border-radius: 10px; margin-bottom: 20px;
-            display: flex; align-items: center; gap: 12px;
+        .era-engine-status {
+            background: #151515; border-radius: 10px; padding: 12px;
+            margin-bottom: 20px; border: 1px solid #252525;
+            display: flex; align-items: center; gap: 15px;
         }
-        .era-brain-icon { width: 32px; height: 32px; background: #ff1f1f; border-radius: 50%; box-shadow: 0 0 15px #ff1f1f; display:flex; align-items:center; justify-content:center; }
-        .era-engine-info h4 { margin: 0; font-size: 14px; color: #ff1f1f; text-shadow: 0 0 5px rgba(255,31,31,0.5); }
-        .era-engine-info p { margin: 0; font-size: 10px; color: #888; }
+        .era-fox-logo { font-size: 24px; filter: drop-shadow(0 0 8px #ff1f1f); }
+        .era-info h4 { margin: 0; font-size: 13px; color: #ff1f1f; }
+        .era-info p { margin: 0; font-size: 9px; color: #666; }
 
-        .era-status-line { font-size: 11px; margin-bottom: 15px; color: #4caf50; display: flex; align-items: center; gap: 8px; }
-        .era-pulse { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-
-        .era-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; background: #050505; padding: 5px; border-radius: 8px; }
-        .mode-btn {
-            background: transparent; border: none; color: #444; padding: 10px 0; 
-            font-size: 11px; cursor: pointer; border-radius: 6px; transition: 0.3s;
+        .era-mode-selector { display: flex; gap: 10px; background: #000; padding: 5px; border-radius: 10px; border: 1px solid #1a1a1a; }
+        .mode-tab {
+            flex: 1; background: transparent; border: none; color: #444; padding: 12px 0; 
+            font-size: 11px; cursor: pointer; border-radius: 7px; transition: 0.3s; font-weight: bold;
         }
-        .mode-btn.active { background: #1a0a0a; color: #ff1f1f; border: 1px solid #451010; font-weight: bold; }
+        .mode-tab.active { background: #ff1f1f; color: #000; box-shadow: 0 0 15px rgba(255, 31, 31, 0.5); }
 
-        .correct-frame { 
-            border: 3px solid #ff1f1f !important; 
-            background: rgba(255, 31, 31, 0.08) !important;
-            box-shadow: 0 0 20px rgba(255, 31, 31, 0.5) !important;
-            transition: 0.4s;
+        /* Эффект подсветки ответа на странице */
+        .era-correct-highlight { 
+            border: 4px solid #ff1f1f !important; 
+            background: rgba(255, 31, 31, 0.1) !important;
+            box-shadow: 0 0 30px rgba(255, 31, 31, 0.6) !important;
+            border-radius: 12px !important;
+            transform: scale(1.02);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
     `;
 
-    const injectUI = () => {
-        if (document.getElementById('era-neural-panel')) return;
-        const styleSheet = document.createElement("style");
-        styleSheet.innerText = styles;
-        document.head.appendChild(styleSheet);
+    const createPanel = () => {
+        if (document.getElementById('era-absolute-panel')) return;
+        const s = document.createElement("style");
+        s.innerText = styles;
+        document.head.appendChild(s);
 
-        const panel = document.createElement('div');
-        panel.id = 'era-neural-panel';
-        panel.innerHTML = `
-            <div class="era-title">НЕЙРОПРОТОКОЛ</div>
-            <div class="era-engine-box">
-                <div class="era-brain-icon">🦊</div>
-                <div class="era-engine-info">
+        const p = document.createElement('div');
+        p.id = 'era-absolute-panel';
+        p.innerHTML = `
+            <div class="era-header-small">ERA-NEURAL LOGIC</div>
+            <div class="era-engine-status">
+                <div class="era-fox-logo">🦊</div>
+                <div class="era-info">
                     <h4>Erafox Engine vX</h4>
-                    <p>Neural Logic Active</p>
+                    <p>Analysis: Active</p>
                 </div>
             </div>
             
-            <div class="era-status-line">
-                <div class="era-pulse"></div> Анализ структуры данных...
+            <div class="era-mode-selector">
+                <button class="mode-tab active" id="btn-show">ПОДСВЕТКА</button>
+                <button class="mode-tab" id="btn-auto">АВТО</button>
             </div>
-
-            <div class="era-title">РЕЖИМ</div>
-            <div class="era-modes">
-                <button class="mode-btn" id="m-auto">Авто</button>
-                <button class="mode-btn active" id="m-show">Подсветка</button>
-                <button class="mode-btn" id="m-stealth">Стелс</button>
-            </div>
+            <div style="margin-top:15px; font-size:10px; color:#4caf50; text-align:center;">● Протокол синхронизирован</div>
         `;
-        document.body.appendChild(panel);
+        document.body.appendChild(p);
 
-        document.getElementById('m-auto').onclick = () => setMode('Авто');
-        document.getElementById('m-show').onclick = () => setMode('Подсветка');
-        document.getElementById('m-stealth').onclick = () => setMode('Стелс');
+        document.getElementById('btn-show').onclick = () => switchMode('Подсветка');
+        document.getElementById('btn-auto').onclick = () => switchMode('Авто');
     };
 
-    const setMode = (mode) => {
-        activeMode = mode;
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(`m-${mode === 'Авто' ? 'auto' : mode === 'Подсветка' ? 'show' : 'stealth'}`).classList.add('active');
-        processQuestions();
+    const switchMode = (m) => {
+        activeMode = m;
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(m === 'Подсветка' ? 'btn-show' : 'btn-auto').classList.add('active');
+        runLogic();
     };
 
-    const processQuestions = () => {
+    const runLogic = () => {
         try {
-            // Прямий доступ до ядра тестів Naurok через Angular scope
-            const testContainer = document.querySelector('[ng-controller="TestController"]');
-            if (!testContainer) return;
-            const scope = angular.element(testContainer).scope();
+            // Прямое чтение данных из Angular-контроллера Naurok
+            const controller = document.querySelector('[ng-controller="TestController"]');
+            if (!controller) return;
+            const scope = angular.element(controller).scope();
             
-            // Отримуємо поточне питання та всі дані тесту
-            const allQuestions = scope.ng_data.questions;
-            const currentIdx = scope.currentQuestionIndex;
-            const questionData = allQuestions[currentIdx];
+            const qData = scope.ng_data.questions[scope.currentQuestionIndex];
 
-            if (questionData) {
-                // Визначаємо ID правильних відповідей
-                const correctAnswers = questionData.options.filter(o => o.is_correct).map(o => o.id);
-                const visualOptions = document.querySelectorAll('.test-item-answer-item');
+            if (qData) {
+                const correctIds = qData.options.filter(o => o.is_correct).map(o => o.id);
+                const optionsOnPage = document.querySelectorAll('.test-item-answer-item');
 
-                visualOptions.forEach(el => {
-                    const elId = parseInt(el.getAttribute('data-id'));
-                    el.classList.remove('correct-frame');
+                optionsOnPage.forEach(el => {
+                    const id = parseInt(el.getAttribute('data-id'));
+                    el.classList.remove('era-correct-highlight');
 
-                    if (correctAnswers.includes(elId)) {
-                        if (activeMode === 'Подсветка' || activeMode === 'Авто') {
-                            el.classList.add('correct-frame');
-                        }
+                    if (correctIds.includes(id)) {
+                        // Режим Подсветки: просто выделяем
+                        el.classList.add('era-correct-highlight');
+                        
+                        // Режим Авто: выделяем + нажимаем
                         if (activeMode === 'Авто') {
-                            // Авто-клік через 1 секунду для імітації роздумів
                             setTimeout(() => {
                                 if (activeMode === 'Авто') el.click();
-                            }, 1000);
+                            }, 900); // Задержка 0.9 сек для имитации человека
                         }
                     }
                 });
             }
-        } catch (err) { /* Logic wait */ }
+        } catch (e) { /* Анализ в процессе */ }
     };
 
-    // Запуск та моніторинг
-    const run = () => {
-        injectUI();
-        processQuestions();
-    };
-
-    setInterval(run, 1000);
+    // Глобальный цикл мониторинга
+    setInterval(() => {
+        if (document.body) {
+            createPanel();
+            runLogic();
+        }
+    }, 800);
 
 })();
