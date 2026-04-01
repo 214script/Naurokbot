@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Naurok Red Cyber v13.5 (No API)
+// @name         Naurok Erafox Neural v14
 // @namespace    http://tampermonkey.net
-// @version      13.5
-// @description  Чистий UI за референсом без зайвих запитів. Авто-відповідь та підсвітка.
+// @version      14.0
+// @description  Ексклюзивний інтерфейс Erafox Engine для аналізу тестів Naurok
 // @author       erafox
 // @match        *://naurok.com.ua/test/testing/*
 // @grant        none
@@ -12,62 +12,68 @@
 (function() {
     'use strict';
 
-    let currentMode = 'Подсветка'; 
+    let activeMode = 'Подсветка';
 
     const styles = `
-        #era-cyber-panel {
-            position: fixed; top: 20px; right: 20px; z-index: 9999999;
-            width: 280px; background: #120c0c; border: 1px solid #331a1a;
-            border-radius: 12px; font-family: sans-serif;
-            color: #e0e0e0; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+        #era-neural-panel {
+            position: fixed; top: 20px; right: 20px; z-index: 1000000;
+            width: 280px; background: #0d0d0d; border: 1px solid #451010;
+            border-radius: 12px; font-family: 'Segoe UI', sans-serif;
+            color: #efefef; padding: 18px; box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
         }
-        .era-header { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin: 10px 0 5px; }
-        .era-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .era-card {
-            background: #1a1414; border: 1px solid #2d2424; padding: 8px;
-            border-radius: 8px; cursor: default;
-        }
-        .era-card h4 { margin: 0; font-size: 11px; color: #ff3b3b; opacity: 0.8; }
-        .era-card p { margin: 2px 0 0; font-size: 9px; color: #666; }
-        .era-card.active { border-color: #ff3b3b; box-shadow: 0 0 10px rgba(255, 59, 59, 0.2); }
-
-        .era-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; background: #080505; padding: 4px; border-radius: 8px; margin-top: 5px; }
-        .mode-btn {
-            background: transparent; border: none; color: #555; padding: 10px 5px; 
-            font-size: 11px; cursor: pointer; border-radius: 6px; transition: 0.2s;
-        }
-        .mode-btn.active { background: #1a1414; color: #ff3b3b; border: 1px solid #331a1a; font-weight: bold; }
+        .era-title { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
         
-        /* Ефект підсвітки варіантів на сайті */
-        .cyber-correct-option { 
-            border: 3px solid #ff3b3b !important; 
-            background: rgba(255, 59, 59, 0.05) !important;
-            border-radius: 10px !important;
-            box-shadow: 0 0 15px rgba(255, 59, 59, 0.4) !important;
+        .era-engine-box {
+            background: linear-gradient(145deg, #1a0a0a, #0a0505);
+            border: 1px solid #331111; padding: 12px; border-radius: 10px; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .era-brain-icon { width: 32px; height: 32px; background: #ff1f1f; border-radius: 50%; box-shadow: 0 0 15px #ff1f1f; display:flex; align-items:center; justify-content:center; }
+        .era-engine-info h4 { margin: 0; font-size: 14px; color: #ff1f1f; text-shadow: 0 0 5px rgba(255,31,31,0.5); }
+        .era-engine-info p { margin: 0; font-size: 10px; color: #888; }
+
+        .era-status-line { font-size: 11px; margin-bottom: 15px; color: #4caf50; display: flex; align-items: center; gap: 8px; }
+        .era-pulse { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+        .era-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; background: #050505; padding: 5px; border-radius: 8px; }
+        .mode-btn {
+            background: transparent; border: none; color: #444; padding: 10px 0; 
+            font-size: 11px; cursor: pointer; border-radius: 6px; transition: 0.3s;
+        }
+        .mode-btn.active { background: #1a0a0a; color: #ff1f1f; border: 1px solid #451010; font-weight: bold; }
+
+        .correct-frame { 
+            border: 3px solid #ff1f1f !important; 
+            background: rgba(255, 31, 31, 0.08) !important;
+            box-shadow: 0 0 20px rgba(255, 31, 31, 0.5) !important;
+            transition: 0.4s;
         }
     `;
 
     const injectUI = () => {
-        if (document.getElementById('era-cyber-panel')) return;
+        if (document.getElementById('era-neural-panel')) return;
         const styleSheet = document.createElement("style");
         styleSheet.innerText = styles;
         document.head.appendChild(styleSheet);
 
         const panel = document.createElement('div');
-        panel.id = 'era-cyber-panel';
+        panel.id = 'era-neural-panel';
         panel.innerHTML = `
-            <div class="era-header" style="margin-top:0;">МОДЕЛЬ</div>
-            <div class="era-grid">
-                <div class="era-card active"><h4>GPT OSS 120B</h4><p>Умный & Быстрый</p></div>
-                <div class="era-card"><h4>Llama 3.3</h4><p>Быстрый</p></div>
+            <div class="era-title">НЕЙРОПРОТОКОЛ</div>
+            <div class="era-engine-box">
+                <div class="era-brain-icon">🦊</div>
+                <div class="era-engine-info">
+                    <h4>Erafox Engine vX</h4>
+                    <p>Neural Logic Active</p>
+                </div>
             </div>
             
-            <div class="era-header">СТАТУС</div>
-            <div style="background:#1a1414; border-radius:8px; padding:10px; border:1px solid #2d2424; font-size:11px;">
-                <span style="color:#4caf50;">●</span> Система активна (v13.5)
+            <div class="era-status-line">
+                <div class="era-pulse"></div> Анализ структуры данных...
             </div>
 
-            <div class="era-header">РЕЖИМ</div>
+            <div class="era-title">РЕЖИМ</div>
             <div class="era-modes">
                 <button class="mode-btn" id="m-auto">Авто</button>
                 <button class="mode-btn active" id="m-show">Подсветка</button>
@@ -82,53 +88,55 @@
     };
 
     const setMode = (mode) => {
-        currentMode = mode;
+        activeMode = mode;
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        const btnId = mode === 'Авто' ? 'm-auto' : mode === 'Подсветка' ? 'm-show' : 'm-stealth';
-        document.getElementById(btnId).classList.add('active');
-        runHack();
+        document.getElementById(`m-${mode === 'Авто' ? 'auto' : mode === 'Подсветка' ? 'show' : 'stealth'}`).classList.add('active');
+        processQuestions();
     };
 
-    const runHack = () => {
+    const processQuestions = () => {
         try {
-            // Отримуємо дані з об'єкта Naurok
-            const ngElement = document.querySelector('[ng-controller="TestController"]');
-            if (!ngElement) return;
+            // Прямий доступ до ядра тестів Naurok через Angular scope
+            const testContainer = document.querySelector('[ng-controller="TestController"]');
+            if (!testContainer) return;
+            const scope = angular.element(testContainer).scope();
             
-            const scope = angular.element(ngElement).scope();
-            const questions = scope.ng_data.questions;
-            const currentQIndex = scope.currentQuestionIndex;
-            const currentQuestion = questions[currentQIndex];
+            // Отримуємо поточне питання та всі дані тесту
+            const allQuestions = scope.ng_data.questions;
+            const currentIdx = scope.currentQuestionIndex;
+            const questionData = allQuestions[currentIdx];
 
-            if (currentQuestion) {
-                const correctIds = currentQuestion.options.filter(o => o.is_correct).map(o => o.id);
-                const domOptions = document.querySelectorAll('.test-item-answer-item');
+            if (questionData) {
+                // Визначаємо ID правильних відповідей
+                const correctAnswers = questionData.options.filter(o => o.is_correct).map(o => o.id);
+                const visualOptions = document.querySelectorAll('.test-item-answer-item');
 
-                domOptions.forEach(optionElement => {
-                    const optionId = parseInt(optionElement.getAttribute('data-id'));
-                    optionElement.classList.remove('cyber-correct-option');
+                visualOptions.forEach(el => {
+                    const elId = parseInt(el.getAttribute('data-id'));
+                    el.classList.remove('correct-frame');
 
-                    if (correctIds.includes(optionId)) {
-                        if (currentMode === 'Подсветка' || currentMode === 'Авто') {
-                            optionElement.classList.add('cyber-correct-option');
+                    if (correctAnswers.includes(elId)) {
+                        if (activeMode === 'Подсветка' || activeMode === 'Авто') {
+                            el.classList.add('correct-frame');
                         }
-                        if (currentMode === 'Авто') {
-                            // Авто-клік з невеликою затримкою для імітації людини
+                        if (activeMode === 'Авто') {
+                            // Авто-клік через 1 секунду для імітації роздумів
                             setTimeout(() => {
-                                if (currentMode === 'Авто') optionElement.click();
-                            }, 1200);
+                                if (activeMode === 'Авто') el.click();
+                            }, 1000);
                         }
                     }
                 });
             }
-        } catch (e) { /* silent fail */ }
+        } catch (err) { /* Logic wait */ }
     };
 
-    const setInterv = setInterval(() => {
-        if (document.body) {
-            injectUI();
-            runHack();
-        }
-    }, 1000);
+    // Запуск та моніторинг
+    const run = () => {
+        injectUI();
+        processQuestions();
+    };
+
+    setInterval(run, 1000);
 
 })();
