@@ -1,18 +1,19 @@
 // ==UserScript==
-// @name         har42 by aega1 (discord)
+// @name         har42 by aega1 (discord) [Violentmonkey Edition]
 // @namespace    http://tampermonkey.net/
-// @version      1.1
-// @description  added mobile support 
+// @version      1.2
+// @description  now work on violent monkey soon i add more language
 // @author       aega1
 // @match        https://naurok.com.ua/*
-// @run-at       document-start
+// @run-at       document-idle
+// @inject-into  content
 // @connect      generativelanguage.googleapis.com
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     // === БЛОК ОБХОДУ БЕЗПЕКИ ТА АНТИЧИТУ ===
@@ -41,12 +42,12 @@
     }
 
     disableSecurityChecks();
-    document.addEventListener('DOMContentLoaded', disableSecurityChecks);
 
-    // === ОСНОВНИЙ СКРИПТ (ІНТЕРФЕЙС ТА AI) ===
-    window.addEventListener('load', () => {
-        // 1. Стилі Neumorphism Dark UI з підтримкою мобільних екранів
+    // === СТИЛІ ІНТЕРФЕЙСУ ===
+    function injectStyles() {
+        if (document.getElementById('naurok-ui-styles')) return;
         const style = document.createElement('style');
+        style.id = 'naurok-ui-styles';
         style.innerHTML = `
             #naurok-ui-panel {
                 position: fixed;
@@ -65,6 +66,7 @@
                 touch-action: none;
                 color: #a6adbb;
                 border: 1px solid rgba(255, 255, 255, 0.03);
+                will-change: transform, left, top;
             }
             #naurok-ui-header {
                 padding: 16px 18px 8px 18px;
@@ -185,44 +187,24 @@
             .naurok-ai-correct-red * { color: #ffffff !important; }
         `;
         document.head.appendChild(style);
+    }
 
-        // 2. Зчитування ключа
-        const savedKey = GM_getValue('GEMINI_SINGLE_KEY', '');
+    // === ПЕРЕТЯГУВАННЯ З OPTIMIZED REQUESTANIMATIONFRAME ===
+    function makeDraggable(panel, header) {
+        let isDragging = false;
+        let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+        let currentX = 0, currentY = 0;
+        let ticking = false;
 
-        // 3. Створення інтерфейсу
-        const panel = document.createElement('div');
-        panel.id = 'naurok-ui-panel';
-        panel.innerHTML = `
-            <div id="naurok-ui-header">
-                <span class="header-title">har42 by aega1 (discord)</span>
-                <div class="header-controls">
-                    <span id="btn-toggle-ui" title="Згорнути">−</span>
-                    <span id="btn-close-ui" title="Закрити">✕</span>
-                </div>
-            </div>
-            <div id="naurok-ui-body">
-                <div class="key-title">Gemini API Key</div>
-                <input type="password" id="key-single" class="naurok-input" placeholder="Введіть ключ Gemini..." value="${savedKey}">
-                <button id="btn-save-key" class="naurok-btn-secondary">Зберегти ключ</button>
-                <button id="btn-solve" class="naurok-btn-primary">Вирішити</button>
-                <div id="naurok-answer-box">Готово до роботи</div>
-            </div>
-        `;
-        document.body.appendChild(panel);
-
-        const header = panel.querySelector('#naurok-ui-header');
-        const body = panel.querySelector('#naurok-ui-body');
-        const toggleBtn = panel.querySelector('#btn-toggle-ui');
-        const closeBtn = panel.querySelector('#btn-close-ui');
-        const answerBox = panel.querySelector('#naurok-answer-box');
-        const solveBtn = panel.querySelector('#btn-solve');
-
-        // 4. УНІВЕРСАЛЬНЕ ПЕРЕТЯГУВАННЯ (MICE & TOUCH FOR PHONES)
-        let isDragging = false, startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+        function updatePosition() {
+            panel.style.left = `${currentX}px`;
+            panel.style.top = `${currentY}px`;
+            ticking = false;
+        }
 
         function onDragStart(e) {
             if (e.target.tagName === 'SPAN' && e.target.parentElement.classList.contains('header-controls')) return;
-            
+
             isDragging = true;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -251,40 +233,118 @@
             let newLeft = initialLeft + deltaX;
             let newTop = initialTop + deltaY;
 
-            // Обмеження, щоб панель не вилітала за межі екрана смартфона
             const maxLeft = window.innerWidth - panel.offsetWidth;
             const maxTop = window.innerHeight - panel.offsetHeight;
 
-            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-            newTop = Math.max(0, Math.min(newTop, maxTop));
+            currentX = Math.max(0, Math.min(newLeft, maxLeft));
+            currentY = Math.max(0, Math.min(newTop, maxTop));
 
-            panel.style.left = `${newLeft}px`;
-            panel.style.top = `${newTop}px`;
+            if (!ticking) {
+                requestAnimationFrame(updatePosition);
+                ticking = true;
+            }
         }
 
         function onDragEnd() {
             isDragging = false;
         }
 
-        // Події миші
         header.addEventListener('mousedown', onDragStart);
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('mouseup', onDragEnd);
 
-        // Сенсорні події для смартфонів (iOS / Android)
         header.addEventListener('touchstart', onDragStart, { passive: false });
         document.addEventListener('touchmove', onDragMove, { passive: false });
         document.addEventListener('touchend', onDragEnd);
+    }
 
-        // Кнопки управління UI
+    // === ОБРОБКА КАРТИНКИ (ОПТИМІЗОВАНА) ===
+    function getBase64Image(imgElement) {
+        return new Promise((resolve) => {
+            try {
+                const canvas = document.createElement('canvas');
+                // Обмежуємо максимальний розмір для прискорення передачі в API
+                const maxDim = 800;
+                let w = imgElement.naturalWidth || imgElement.width || 300;
+                let h = imgElement.naturalHeight || imgElement.height || 300;
+
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                }
+
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(imgElement, 0, 0, w, h);
+                const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+                resolve(dataURL.split(',')[1]);
+            } catch (e) {
+                resolve(null);
+            }
+        });
+    }
+
+    // === ПРОМІСИФІКОВАНИЙ GM_xmlhttpRequest ДЛЯ VIOLENTMONKEY ===
+    function fetchGemini(apiKey, payload) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+                headers: { 'Content-Type': 'application/json' },
+                data: JSON.stringify(payload),
+                onload: (res) => resolve(res),
+                onerror: (err) => reject(err),
+                ontimeout: () => reject(new Error('Timeout'))
+            });
+        });
+    }
+
+    // === ІНІЦІАЛІЗАЦІЯ ІНТЕРФЕЙСУ ===
+    function initUI() {
+        injectStyles();
+
+        const savedKey = GM_getValue('GEMINI_SINGLE_KEY', '');
+
+        const panel = document.createElement('div');
+        panel.id = 'naurok-ui-panel';
+        panel.innerHTML = `
+            <div id="naurok-ui-header">
+                <span class="header-title">har42 by aega1 (VM)</span>
+                <div class="header-controls">
+                    <span id="btn-toggle-ui" title="Згорнути">−</span>
+                    <span id="btn-close-ui" title="Закрити">✕</span>
+                </div>
+            </div>
+            <div id="naurok-ui-body">
+                <div class="key-title">Gemini API Key</div>
+                <input type="password" id="key-single" class="naurok-input" placeholder="Введіть ключ Gemini..." value="${savedKey}">
+                <button id="btn-save-key" class="naurok-btn-secondary">Зберегти ключ</button>
+                <button id="btn-solve" class="naurok-btn-primary">Вирішити</button>
+                <div id="naurok-answer-box">Готово до роботи</div>
+            </div>
+        `;
+        document.body.appendChild(panel);
+
+        const header = panel.querySelector('#naurok-ui-header');
+        const body = panel.querySelector('#naurok-ui-body');
+        const toggleBtn = panel.querySelector('#btn-toggle-ui');
+        const closeBtn = panel.querySelector('#btn-close-ui');
+        const answerBox = panel.querySelector('#naurok-answer-box');
+        const solveBtn = panel.querySelector('#btn-solve');
+
+        makeDraggable(panel, header);
+
         toggleBtn.addEventListener('click', () => {
             body.style.display = (body.style.display === 'none') ? 'flex' : 'none';
             toggleBtn.textContent = (body.style.display === 'none') ? '+' : '−';
         });
+
         closeBtn.addEventListener('click', () => panel.remove());
 
         panel.querySelector('#btn-save-key').addEventListener('click', () => {
-            GM_setValue('GEMINI_SINGLE_KEY', panel.querySelector('#key-single').value.trim());
+            const val = panel.querySelector('#key-single').value.trim();
+            GM_setValue('GEMINI_SINGLE_KEY', val);
             answerBox.textContent = 'Ключ збережено!';
         });
 
@@ -310,7 +370,7 @@
                     const elements = document.querySelectorAll(selector);
                     for (const el of elements) {
                         if (el.closest('#naurok-ui-panel')) continue;
-                        
+
                         const text = el.innerText || el.textContent || '';
                         const cleanText = text.toLowerCase().replace(/\s+/g, '').replace(/[^a-zа-яєіїґ0-9\+\-\*\/\^]/gi, '');
 
@@ -331,23 +391,6 @@
             return highlightedCount > 0;
         }
 
-        function getBase64Image(imgElement) {
-            return new Promise((resolve) => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = imgElement.naturalWidth || imgElement.width;
-                    canvas.height = imgElement.naturalHeight || imgElement.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(imgElement, 0, 0);
-                    const dataURL = canvas.toDataURL('image/jpeg');
-                    resolve(dataURL.split(',')[1]);
-                } catch (e) {
-                    resolve(null);
-                }
-            });
-        }
-
-        // 5. Старт рішення
         solveBtn.addEventListener('click', async () => {
             clearHighlights();
 
@@ -398,40 +441,39 @@ ${clone.innerText}
 
             answerBox.textContent = '⏳ Gemini аналізує...';
 
-            GM_xmlhttpRequest({
-                method: 'POST',
-                url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-                headers: { 'Content-Type': 'application/json' },
-                data: JSON.stringify({ contents: [{ parts: parts }] }),
-                onload: function(response) {
-                    if (response.status === 429) {
-                        answerBox.textContent = 'Ліміт ключа перевищено (429)';
-                        return;
-                    }
-                    if (response.status !== 200) {
-                        answerBox.textContent = `Помилка API (${response.status})`;
-                        return;
-                    }
+            try {
+                const response = await fetchGemini(apiKey, { contents: [{ parts: parts }] });
 
-                    try {
-                        const res = JSON.parse(response.responseText);
-                        const aiResult = res.candidates[0].content.parts[0].text.trim();
-
-                        answerBox.innerHTML = `Відповідь: <b style="color:#ff5e36">${aiResult}</b>`;
-                        navigator.clipboard.writeText(aiResult).catch(err => console.error(err));
-
-                        const isHighlighted = highlightAnswersOnPage(aiResult);
-                        if (!isHighlighted) {
-                            answerBox.innerHTML += `<br><span style="color:#6c727f; font-size:10px;">(Елементи не знайдено)</span>`;
-                        }
-                    } catch (e) {
-                        answerBox.textContent = 'Помилка обробки';
-                    }
-                },
-                onerror: function() {
-                    answerBox.textContent = 'Помилка мережі';
+                if (response.status === 429) {
+                    answerBox.textContent = 'Ліміт ключа перевищено (429)';
+                    return;
                 }
-            });
+                if (response.status !== 200) {
+                    answerBox.textContent = `Помилка API (${response.status})`;
+                    return;
+                }
+
+                const res = JSON.parse(response.responseText);
+                const aiResult = res.candidates[0].content.parts[0].text.trim();
+
+                answerBox.innerHTML = `Відповідь: <b style="color:#ff5e36">${aiResult}</b>`;
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(aiResult).catch(() => {});
+                }
+
+                const isHighlighted = highlightAnswersOnPage(aiResult);
+                if (!isHighlighted) {
+                    answerBox.innerHTML += `<br><span style="color:#6c727f; font-size:10px;">(Елементи не знайдено)</span>`;
+                }
+            } catch (err) {
+                answerBox.textContent = 'Помилка мережі/запиту';
+            }
         });
-    });
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initUI();
+    } else {
+        window.addEventListener('DOMContentLoaded', initUI);
+    }
 })();
