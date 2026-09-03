@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         har42 by aega1 (discord)
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  first release by aega1(discord) with open source
+// @version      9.3
+// @description  firtt release by aega1
 // @author       aega1
 // @match        https://naurok.com.ua/*
 // @run-at       document-start
@@ -17,9 +17,7 @@
 
     // === БЛОК ОБХОДУ БЕЗПЕКИ ТА АНТИЧИТУ ===
     function disableSecurityChecks() {
-        // 1. Блокуємо події втрати фокусу та згортання вкладок
         const eventsToBlock = ['blur', 'focusout', 'visibilitychange', 'webkitvisibilitychange', 'mouseleave'];
-
         eventsToBlock.forEach(eventName => {
             window.addEventListener(eventName, (e) => {
                 e.stopImmediatePropagation();
@@ -27,7 +25,6 @@
             }, true);
         });
 
-        // 2. Перевизначаємо властивості показу сторінки (щоб Naurok думав, що вкладка завжди активна)
         try {
             Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
             Object.defineProperty(document, 'webkitHidden', { get: () => false, configurable: true });
@@ -35,7 +32,6 @@
             Object.defineProperty(document, 'hasFocus', { value: () => true, configurable: true });
         } catch (e) {}
 
-        // 3. Дозволяємо виділення тексту, копіювання та контекстне меню
         const allowEvents = ['copy', 'cut', 'paste', 'selectstart', 'contextmenu'];
         allowEvents.forEach(eventName => {
             document.addEventListener(eventName, (e) => {
@@ -44,36 +40,39 @@
         });
     }
 
-    // Запускаємо обхід безпеки одразу та після повного завантаження
     disableSecurityChecks();
     document.addEventListener('DOMContentLoaded', disableSecurityChecks);
 
     // === ОСНОВНИЙ СКРИПТ (ІНТЕРФЕЙС ТА AI) ===
     window.addEventListener('load', () => {
-        // 1. Стилі Neumorphism Dark UI
+        // 1. Стилі Neumorphism Dark UI з підтримкою мобільних екранів
         const style = document.createElement('style');
         style.innerHTML = `
             #naurok-ui-panel {
                 position: fixed;
                 top: 20px;
-                right: 20px;
+                right: 15px;
                 z-index: 999999;
-                width: 310px;
+                width: 290px;
+                max-width: calc(100vw - 30px);
                 background: #24272c;
                 border-radius: 24px;
                 box-shadow: 12px 12px 24px #1a1c20, -8px -8px 20px #2e3238;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 overflow: hidden;
                 user-select: none;
+                -webkit-user-select: none;
+                touch-action: none;
                 color: #a6adbb;
                 border: 1px solid rgba(255, 255, 255, 0.03);
             }
             #naurok-ui-header {
-                padding: 16px 20px 8px 20px;
+                padding: 16px 18px 8px 18px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 cursor: move;
+                touch-action: none;
             }
             .header-title {
                 font-size: 13px;
@@ -96,15 +95,16 @@
                 margin-left: 6px;
                 transition: all 0.2s ease;
             }
-            .header-controls span:hover {
+            .header-controls span:active {
                 color: #ff4500;
                 box-shadow: inset 2px 2px 5px #1a1c20, inset -2px -2px 5px #2e3238;
             }
             #naurok-ui-body {
-                padding: 12px 20px 20px 20px;
+                padding: 12px 18px 18px 18px;
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                touch-action: auto;
             }
             .key-title {
                 font-size: 11px;
@@ -125,7 +125,6 @@
                 color: #ffffff;
                 box-shadow: inset 4px 4px 8px #1a1c20, inset -4px -4px 8px #2e3238;
                 box-sizing: border-box;
-                transition: all 0.2s ease;
             }
             .naurok-input::placeholder { color: #555b66; }
             .naurok-btn-secondary {
@@ -139,7 +138,6 @@
                 font-weight: 600;
                 cursor: pointer;
                 box-shadow: 4px 4px 8px #1a1c20, -4px -4px 8px #2e3238;
-                transition: all 0.2s ease;
             }
             .naurok-btn-secondary:active {
                 box-shadow: inset 3px 3px 6px #1a1c20, inset -3px -3px 6px #2e3238;
@@ -158,7 +156,6 @@
                 text-transform: uppercase;
                 cursor: pointer;
                 box-shadow: 0 8px 16px rgba(255, 42, 0, 0.35), inset 1px 1px 2px rgba(255, 255, 255, 0.4);
-                transition: all 0.2s ease;
                 margin-top: 4px;
             }
             .naurok-btn-primary:active {
@@ -167,7 +164,7 @@
             }
             #naurok-answer-box {
                 background: #24272c;
-                padding: 14px;
+                padding: 12px;
                 border-radius: 16px;
                 font-size: 12px;
                 font-weight: 600;
@@ -192,7 +189,7 @@
         // 2. Зчитування ключа
         const savedKey = GM_getValue('GEMINI_SINGLE_KEY', '');
 
-        // 3. Інтерфейс
+        // 3. Створення інтерфейсу
         const panel = document.createElement('div');
         panel.id = 'naurok-ui-panel';
         panel.innerHTML = `
@@ -208,7 +205,7 @@
                 <input type="password" id="key-single" class="naurok-input" placeholder="Введіть ключ Gemini..." value="${savedKey}">
                 <button id="btn-save-key" class="naurok-btn-secondary">Зберегти ключ</button>
                 <button id="btn-solve" class="naurok-btn-primary">Вирішити</button>
-                <div id="naurok-answer-box">Захист вимкнено! Готово</div>
+                <div id="naurok-answer-box">Готово до роботи</div>
             </div>
         `;
         document.body.appendChild(panel);
@@ -220,23 +217,66 @@
         const answerBox = panel.querySelector('#naurok-answer-box');
         const solveBtn = panel.querySelector('#btn-solve');
 
-        // 4. Перетягування
-        let isDragging = false, offsetX = 0, offsetY = 0;
-        header.addEventListener('mousedown', (e) => {
+        // 4. УНІВЕРСАЛЬНЕ ПЕРЕТЯГУВАННЯ (MICE & TOUCH FOR PHONES)
+        let isDragging = false, startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+
+        function onDragStart(e) {
             if (e.target.tagName === 'SPAN' && e.target.parentElement.classList.contains('header-controls')) return;
+            
             isDragging = true;
-            offsetX = e.clientX - panel.getBoundingClientRect().left;
-            offsetY = e.clientY - panel.getBoundingClientRect().top;
-        });
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            panel.style.left = `${e.clientX - offsetX}px`;
-            panel.style.top = `${e.clientY - offsetY}px`;
+            startX = clientX;
+            startY = clientY;
+
+            const rect = panel.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+
             panel.style.right = 'auto';
-        });
+            panel.style.bottom = 'auto';
+        }
 
-        document.addEventListener('mouseup', () => { isDragging = false; });
+        function onDragMove(e) {
+            if (!isDragging) return;
+            if (e.cancelable) e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const deltaX = clientX - startX;
+            const deltaY = clientY - startY;
+
+            let newLeft = initialLeft + deltaX;
+            let newTop = initialTop + deltaY;
+
+            // Обмеження, щоб панель не вилітала за межі екрана смартфона
+            const maxLeft = window.innerWidth - panel.offsetWidth;
+            const maxTop = window.innerHeight - panel.offsetHeight;
+
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            newTop = Math.max(0, Math.min(newTop, maxTop));
+
+            panel.style.left = `${newLeft}px`;
+            panel.style.top = `${newTop}px`;
+        }
+
+        function onDragEnd() {
+            isDragging = false;
+        }
+
+        // Події миші
+        header.addEventListener('mousedown', onDragStart);
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+
+        // Сенсорні події для смартфонів (iOS / Android)
+        header.addEventListener('touchstart', onDragStart, { passive: false });
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+
+        // Кнопки управління UI
         toggleBtn.addEventListener('click', () => {
             body.style.display = (body.style.display === 'none') ? 'flex' : 'none';
             toggleBtn.textContent = (body.style.display === 'none') ? '+' : '−';
@@ -270,7 +310,7 @@
                     const elements = document.querySelectorAll(selector);
                     for (const el of elements) {
                         if (el.closest('#naurok-ui-panel')) continue;
-
+                        
                         const text = el.innerText || el.textContent || '';
                         const cleanText = text.toLowerCase().replace(/\s+/g, '').replace(/[^a-zа-яєіїґ0-9\+\-\*\/\^]/gi, '');
 
@@ -343,7 +383,7 @@
                 }
             }
 
-            const promptText = `Ти помічник з вирішення тестових завдань.
+            const promptText = `Ти помічник з вирішення тестових завдань. 
 Ось текст сторінки тесту:
 ${clone.innerText}
 
