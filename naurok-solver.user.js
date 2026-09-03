@@ -2,7 +2,7 @@
 // @name         har42 by aega1 (discord)
 // @namespace    http://tampermonkey.net/
 // @version      1.2
-// @description  now work on violent monkey (soon add more language)
+// @description  soon add more language
 // @author       aega1
 // @match        https://naurok.com.ua/*
 // @run-at       document-idle
