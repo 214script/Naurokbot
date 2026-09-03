@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         har42 by aega1 (discord)
 // @namespace    http://tampermonkey.net/
-// @version      9.3
-// @description  firtt release by aega1
+// @version      1.1
+// @description  added mobile support 
 // @author       aega1
 // @match        https://naurok.com.ua/*
 // @run-at       document-start
