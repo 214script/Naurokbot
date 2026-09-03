@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         har42 by aega1 (discord) [Violentmonkey Edition]
+// @name         har42 by aega1 (discord)
 // @namespace    http://tampermonkey.net/
 // @version      1.2
-// @description  now work on violent monkey soon i add more language
+// @description  now work on violent monkey (soon add more language)
 // @author       aega1
 // @match        https://naurok.com.ua/*
 // @run-at       document-idle
@@ -263,7 +263,6 @@
         return new Promise((resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                // Обмежуємо максимальний розмір для прискорення передачі в API
                 const maxDim = 800;
                 let w = imgElement.naturalWidth || imgElement.width || 300;
                 let h = imgElement.naturalHeight || imgElement.height || 300;
@@ -310,7 +309,7 @@
         panel.id = 'naurok-ui-panel';
         panel.innerHTML = `
             <div id="naurok-ui-header">
-                <span class="header-title">har42 by aega1 (VM)</span>
+                <span class="header-title">har42 by aega1 (discord)</span>
                 <div class="header-controls">
                     <span id="btn-toggle-ui" title="Згорнути">−</span>
                     <span id="btn-close-ui" title="Закрити">✕</span>
