@@ -2,7 +2,7 @@
 // @name         har42 by aega1 (discord)
 // @namespace    http://tampermonkey.net/
 // @version      9.2
-// @description  AI Solver для "На Урок" з підтримкою фото, декількох відповідей та обходом анти-античит захисту
+// @description  first release by aega1(discord) with open source
 // @author       aega1
 // @match        https://naurok.com.ua/*
 // @run-at       document-start
